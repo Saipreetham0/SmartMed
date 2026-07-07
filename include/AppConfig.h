@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 // Firmware version (reported by /api/v1/info; bump on releases).
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "2.0.0"
 
 // Number of medicine chambers.
 #define NUM_CHAMBERS 6

@@ -1,6 +1,6 @@
 # SmartMed REST API (v1) — Flutter Integration Guide
 
-Firmware: `1.0.0` · Base path: `/api/v1` · Content type: `application/json`
+Firmware: `2.0.0` · Base path: `/api/v1` · Content type: `application/json`
 
 The device runs an HTTP server on port **80**. All endpoints send permissive
 CORS headers, so a Flutter app (mobile or web) can call them directly.
@@ -47,12 +47,12 @@ uses it over the home network too. `pair` returns `403` once the device is onlin
 
 ### `GET /api/v1/health` — _(open)_
 ```json
-{ "ok": true, "status": "up", "fw": "1.0.0" }
+{ "ok": true, "status": "up", "fw": "2.0.0" }
 ```
 
 ### `GET /api/v1/info` — _(open)_
 ```json
-{ "ok": true, "device_id": "A1B2C3D4E5F6", "fw": "1.0.0", "chambers": 6,
+{ "ok": true, "device_id": "A1B2C3D4E5F6", "fw": "2.0.0", "chambers": 6,
   "mode": "sta", "ip": "192.168.1.42", "mdns": "smartmed.local",
   "uptime_s": 1234, "free_heap": 210000, "rtc_ok": true }
 ```
@@ -75,18 +75,27 @@ Saves credentials and **reboots** to join that network.
   "mode": "sta", "ap": "Medicine Reminder",
   "chambers": [
     { "id": 0, "label": "Aspirin", "hour": 8, "minute": 0, "enabled": true,
+      "start": "2026-07-01", "end": "2026-07-14",
       "alerting": false, "taken": false, "taken_count": 12, "missed_count": 1,
       "last_taken": "08/07 08:02", "last_taken_epoch": 1751... } ]
 }
 ```
-Poll this every ~2 s to drive the UI.
+Poll this every ~2 s to drive the UI. `start`/`end` are the course window (see below);
+empty string `""` means unbounded.
 
 ### `POST /api/v1/schedules` — _(auth)_
 Body: full array of 6 chambers.
 ```json
-{ "chambers": [ { "label": "Aspirin", "hour": 8, "minute": 0, "enabled": true }, … ] }
+{ "chambers": [
+  { "label": "Aspirin", "hour": 8, "minute": 0, "enabled": true,
+    "start": "2026-07-01", "end": "2026-07-14" }, … ] }
 ```
-`hour` 0–23, `minute` 0–59. Persisted to flash.
+- `hour` 0–23, `minute` 0–59. Persisted to flash.
+- **`start` / `end`** (optional) — a **course window** in `YYYY-MM-DD` (the format
+  a Flutter `DatePicker` / HTML `<input type=date>` produces). A reminder only fires
+  on dates **on or after `start`** and **on or before `end`**. Send `""` (or omit) to
+  leave a bound open — e.g. `start` only = "from this date onward", both empty =
+  "every day, indefinitely". Fields not included in the body are left unchanged.
 
 ### `POST /api/v1/time` — _(auth)_
 Set the RTC and/or timezone.
@@ -142,6 +151,8 @@ class SmartMedApi {
   Future<Map<String, dynamic>> status() async =>
       jsonDecode((await http.get(_u('/status'), headers: _headers)).body);
 
+  /// Each chamber: {label, hour, minute, enabled, start?, end?}
+  /// start/end are 'YYYY-MM-DD' course bounds ('' = open).
   Future<void> saveSchedules(List<Map<String, dynamic>> chambers) =>
       http.post(_u('/schedules'),
           headers: _headers, body: jsonEncode({'chambers': chambers}));
